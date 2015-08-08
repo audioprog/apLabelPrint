@@ -33,4 +33,5 @@ HEADERS  += apLabelPrintMainWindow.h \
 FORMS    += apLabelPrintMainWindow.ui
 
 DISTFILES += \
-    .gitignore
+    .gitignore \
+    LICENSE.md
