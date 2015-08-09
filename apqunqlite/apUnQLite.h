@@ -46,11 +46,15 @@ public:
 
 	const QString& groupName() const { return this->m_groupName; }
 
-	const QStringList& groups() const;
+    QStringList groups() const;
 
 	bool isValid() const;
 
-	const QStringList& keys() const;
+    QStringList keys() const;
+
+    bool removeGroup( const QString& groupName );
+
+    bool removeKey( const QString& key);
 
 	QString text( const QString& key, const QString& defaultValue = QString() );
 

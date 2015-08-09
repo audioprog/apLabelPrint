@@ -39,6 +39,7 @@ private Q_SLOTS:
 	void testCase1_data();
 	void testCase1();
 	void testKeys();
+    void testGroups();
 
 private:
 	apUnQLite* unqlite;
@@ -89,7 +90,35 @@ void TestApLabelPrintTest::testKeys()
 	QVERIFY2(this->unqlite->setValue("test2", "newTest2"), "SetValueFailure");
 	QVERIFY2(this->unqlite->text("test1", "test") == "newTest1", "TextFailure");
 	QVERIFY2(this->unqlite->value("test2", "test2") == "newTest2", "ValueFailure");
-	QVERIFY2(this->unqlite->flush(), "FlushFailure");
+    QVERIFY2(this->unqlite->flush(), "FlushFailure");
+}
+
+void TestApLabelPrintTest::testGroups()
+{
+    QVERIFY2(this->unqlite->setText("testGroup1/test1", "g1"), "CreateGroupKeyFailed");
+    QVERIFY2(this->unqlite->groups().join(';') == "testGroup1/", QString("FirstGroupFailed: " + this->unqlite->groups().join(';')).toLatin1().constData());
+    apUnQLite group(*this->unqlite, "testGroup2");
+    QVERIFY2(group.setValue("g2_1", "Gruppe2_1 Täst"), "g2_1Failed");
+    QVERIFY2(group.keys().join(';') == "g2_1", "keys1Failed");
+    QVERIFY2(this->unqlite->groups().join(';') == "testGroup1/;testGroup2/", "Groups2Failed");
+    QVERIFY2(this->unqlite->removeKey("/testGroup1/test1"), "RemoveKeyFailed");
+    QVERIFY2(this->unqlite->groups().join(';') == "testGroup2/", "Groups3Failed");
+    QVERIFY2(group.setText("subGroupä1/key1", "sgä1"), "SubGroupFailed");
+    QVERIFY2(this->unqlite->groups().join(';') == "testGroup2/", "GroupsBaseFailed");
+    QVERIFY2(group.keys().join(";") == "g2_1", "SubGroups1Failed");
+    QVERIFY2(group.groups().join(",") == "subGroupä1/", "SubGroupGroupsFailed");
+    QVERIFY2(group.setText("subGroup2/key1", "sk2"), "SubGroup2Failed");
+    QVERIFY2(group.text("/testGroup2/subGroup2/key1", "x") == "sk2", "SubGroupKeyReadFailed");
+    apUnQLite subGroup2(group, "subGroup2");
+    QVERIFY2(subGroup2.keys().join(';') == "key1", "SubSubGroupKey1Failed");
+    QVERIFY2(subGroup2.clear(), "ClearFailed");
+
+    QVERIFY2(this->unqlite->groups().join(';') == "testGroup2/", "GroupsBaseFailed");
+    QVERIFY2(group.keys().join(";") == "g2_1", "SubGroups1Failed");
+    QVERIFY2(group.groups().join(",") == "subGroupä1/", "SubGroupGroupsFailed");
+    QVERIFY2(group.removeKey("g2_1"), "RemoveSubKey1Failed");
+    QVERIFY2(group.removeKey("subGroupä1/key1"), "RemoveSubSubKey1Failed");
+    QVERIFY2(this->unqlite->groups().isEmpty(), "LastRemoveFailed");
 }
 
 QTEST_APPLESS_MAIN(TestApLabelPrintTest)

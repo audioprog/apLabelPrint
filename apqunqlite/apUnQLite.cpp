@@ -77,7 +77,7 @@ public:
 
 		const QStringList allGroups = this->groups.keys();
 
-		const QString groupName = group.section('/', -2, -2);
+        const QString groupName = group.section('/', -2);
 
 		if ( ! groupName.isEmpty())
 		{
@@ -116,10 +116,14 @@ public:
 
 	void createGroupPath(QString group)
 	{
+        if ( !groups.contains(group))
+        {
+            groups[group] = QStringList();
+        }
 		while ( ! group.isEmpty())
 		{
-			QString subGroup = group.section('/', -1);
-			group.chop(subGroup.length() + 1);
+            QString subGroup = group.section('/', -2);
+            group.chop(subGroup.length());
 
 			if (groups.contains(group))
 			{
@@ -135,7 +139,7 @@ public:
 		}
 	}
 
-	const QStringList& getGroups( const QString& group ) const {
+    QStringList getGroups( const QString& group ) const {
 		if (this->groups.contains(group)) {
 			return this->groups[group];
 		}
@@ -144,7 +148,7 @@ public:
 		}
 	}
 
-	const QStringList& getKeys( const QString& group ) const {
+    QStringList getKeys( const QString& group ) const {
 		if (this->keys.contains(group)) {
 			return this->keys[group];
 		}
@@ -152,6 +156,27 @@ public:
 			return empty;
 		}
 	}
+
+    bool removeKey( const QString& key )
+    {
+        QString endKey = key.section('/', -1);
+        QString group = key.left(key.length() - endKey.length());
+
+        keys[group].removeAll(endKey);
+
+        while ( !group.isEmpty() && keys[group].isEmpty() && groups[group].isEmpty() )
+        {
+            groups.remove(group);
+            keys.remove(group);
+
+            QString groupName = group.section('/', -2);
+            group.chop(groupName.count());
+
+            groups[group].removeAll(groupName);
+        }
+
+        return unQLite.remove(key);
+    }
 
 	void storeKey( const QString& key )
 	{
@@ -230,7 +255,7 @@ bool apUnQLite::flush()
 	return this->data->unQLite.commit();
 }
 
-const QStringList&apUnQLite::groups() const
+QStringList apUnQLite::groups() const
 {
 	return this->data->getGroups(this->group);
 }
@@ -240,9 +265,19 @@ bool apUnQLite::isValid() const
 	return this->data->isValid;
 }
 
-const QStringList&apUnQLite::keys() const
+QStringList apUnQLite::keys() const
 {
-	return this->data->getKeys(this->group);
+    return this->data->getKeys(this->group);
+}
+
+bool apUnQLite::removeGroup(const QString &groupName)
+{
+    return this->data->clear(groupName.startsWith('/') ? groupName.mid(1) : this->group + groupName);
+}
+
+bool apUnQLite::removeKey(const QString &key)
+{
+    return this->data->removeKey(KEY);
 }
 
 bool apUnQLite::setValue(const QString& key, const QByteArray& value)
