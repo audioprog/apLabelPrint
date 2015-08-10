@@ -41,7 +41,7 @@ void apTextEdit::paint(QPainter* painter)
 	int countParagraphs = this->paragraphs;
 	for (int iParagraph = 0; iParagraph < countParagraphs; iParagraph++)
 	{
-		lsTextParagraph& paragraph = this->paragraphs[iParagraph];
+		apTextParagraph& paragraph = this->paragraphs[iParagraph];
 
 		int countSections = paragraph.sections.count();
 
