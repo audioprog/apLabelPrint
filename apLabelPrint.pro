@@ -21,14 +21,16 @@ SOURCES += main.cpp\
     apqunqlite/qunqlite.cpp \
     apqunqlite/qunqlitecursor.cpp \
     apqunqlite/UnQLite/unqlite.c \
-    apqunqlite/apUnQLite.cpp
+    apqunqlite/apUnQLite.cpp \
+    apTextEdit.cpp
 
 HEADERS  += apLabelPrintMainWindow.h \
     apqunqlite/UnQLite/unqlite.h \
     apqunqlite/dpointer.h \
     apqunqlite/qunqlite.h \
     apqunqlite/qunqlitecursor.h \
-    apqunqlite/apUnQLite.h
+    apqunqlite/apUnQLite.h \
+    apTextEdit.h
 
 FORMS    += apLabelPrintMainWindow.ui
 
