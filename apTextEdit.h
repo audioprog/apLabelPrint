@@ -31,7 +31,9 @@ class QPainter;
 
 struct STextSection
 {
-	STextSection() : isMeasured(false) {}
+    STextSection() : ascent(0), yInLine(0), isMeasured(false) {}
+
+    uint ascent;
 
 	QColor color;
 
@@ -39,11 +41,13 @@ struct STextSection
 
 	bool isMeasured;
 
-	QSizeF minSize;
+    QSize minSize;
 
-	QPointF pos;
+    QPoint pos;
 
-	QSizeF size;
+    uint yInLine;
+
+    QSize size;
 
 	QVariant sourceId;
 
@@ -106,11 +110,11 @@ private:
 
 	bool m_isRegionDirty;
 
-	QRectF m_usedArea;
+    QRect m_usedArea;
 
 	QList<apTextParagraph> paragraphs;
 
-	QRectF rect;
+    QRect rect;
 
 	QRegion region;
 };

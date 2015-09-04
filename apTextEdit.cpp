@@ -59,6 +59,7 @@ void apTextEdit::paint(QPainter* painter)
 
 					section.size = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text);
 					section.minSize = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text.trimmed());
+                    section.ascent = QFontMetrics(painter->font()).ascent();
 				}
 			}
 
@@ -66,7 +67,7 @@ void apTextEdit::paint(QPainter* painter)
 		}
 
 
-		QPointF startPoint;
+        QPoint startPoint;
 		if (this->m_isRegionDirty)
 		{
 			QRegion rectRegion = this->region.intersected(this->rect);
@@ -93,9 +94,10 @@ void apTextEdit::paint(QPainter* painter)
 				//
 			}
 
-			double width = 0.0;
+            int width = 0;
 			int maxLineCount = 0;
-			double maxHeight = innerLineRect.height();
+            int maxHeight = innerLineRect.height();
+            uint maxAscent = 0;
 
 			for (int i = 0; i < paragraph.sections.count(); i++)
 			{
@@ -105,6 +107,14 @@ void apTextEdit::paint(QPainter* painter)
 					maxLineCount = i;
 					break;
 				}
+                else
+                {
+                    uint ascent = paragraph.sections.at(i).ascent;
+                    if (ascent > maxAscent)
+                    {
+                        maxAscent = ascent;
+                    }
+                }
 				if (maxHeight < paragraph.sections.at(i).size.height())
 				{
 					maxHeight = paragraph.sections.at(i).size.height();
@@ -121,10 +131,11 @@ void apTextEdit::paint(QPainter* painter)
 
 			for (int iSection = 0; iSection < paragraph.sections.count(); iSection++)
 			{
+                paragraph.sections.at(iSection).yInLine = maxAscent - paragraph.sections.at(iSection).ascent;
 				bool isSearching = true;
 				while (isSearching)
 				{
-					QRect testRect = QRect(QPoint(x, y), paragraph.sections.at(iSection).minSize);
+                    QRect testRect = QRect(QPoint(x, y + paragraph.sections.at(iSection).yInLine), paragraph.sections.at(iSection).minSize);
 					QRegion singleRegion = lineRegion.intersected(testRect);
 					if (singleRegion.isEmpty())
 					{
