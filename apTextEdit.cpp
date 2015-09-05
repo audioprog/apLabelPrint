@@ -27,6 +27,7 @@
 
 apTextEdit::apTextEdit(QObject *parent)
 	: QObject(parent)
+    , m_isEmptyRegion(false)
 	, m_isRegionDirty(true)
 	, m_isVisible(true)
 {
@@ -36,9 +37,95 @@ apTextEdit::~apTextEdit()
 {
 }
 
+void apTextEdit::measure(QPainter* painter, apTextParagraph& paragraph, int countSections)
+{
+    for (int iSection = 0; iSection < countSections; iSection++)
+    {
+        STextSection& section = paragraph.sections[iSection];
+
+        if ( ! section.isMeasured)
+        {
+            section.isMeasured = true;
+
+            painter->setFont(section.font);
+
+            section.size = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text).size();
+            section.minSize = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text.trimmed()).size();
+            section.ascent = QFontMetrics(painter->font()).ascent();
+        }
+    }
+
+    paragraph.m_isMeasured = true;
+}
+
+QRect apTextEdit::searchLineFullHeight(const QRect& regionRect, QRect& lineRect, QRegion& lineRegion)
+{
+    QRect innerLineRect = lineRegion.boundingRect();
+    while (lineRect.bottom() <= regionRect.bottom()
+           && innerLineRect.height() < lineRect.height())
+    {
+        int y = innerLineRect.bottom() == lineRect.bottom() ? innerLineRect.top() : lineRect.bottom();
+        lineRect = QRect(this->rect.x(), y, this->rect.width(), lineRect.height());
+        lineRegion = this->region.intersected(lineRect);
+        innerLineRect = lineRegion.boundingRect();
+    }
+
+    return innerLineRect;
+}
+
+QSize apTextEdit::detWordSize(const QList<STextSection>& sections, int sectionIndexStart, int& wordLastSectionIndex)
+{
+    QSize wordSize = sections.at(sectionIndexStart).minSize;
+    if ( !sections.at(sectionIndexStart).text.endsWith(' '))
+    {
+        for (int i = sectionIndexStart + 1; i < sections.count(); i++)
+        {
+            wordSize.setWidth(wordSize.width() + sections.at(i).minSize.width());
+            if (wordSize.height() < sections.at(i).size.height())
+            {
+                wordSize.setHeight(sections.at(i).size.height());
+            }
+            wordLastSectionIndex = i;
+            if (sections.at(i).text.endsWith(' '))
+            {
+                break;
+            }
+        }
+    }
+
+    return wordSize;
+}
+
+QRect apTextEdit::detWordRect(const QRect &regionRect, const QPoint& startPoint, const QSize& wordSize, QRect &lineRect, QRegion &lineRegion, QRect &innerLineRect)
+{
+    QRect wordRect(startPoint, wordSize);
+    QRegion wordRegion = lineRegion.intersected(wordRect);
+    QRegion testRegion = wordRegion.xored(wordRect);
+    while ( ! testRegion.isEmpty())
+    {
+        wordRect.setX(testRegion.boundingRect().right());
+        wordRegion = lineRegion.intersected(wordRect);
+        testRegion = wordRegion.xored(wordRect);
+        if (wordRect.right() > innerLineRect.right())
+        {
+            lineRect = QRect(this->rect.x(), lineRect.y() + 1, this->rect.width(), wordSize.height());
+            if (lineRect.bottom() > regionRect.bottom())
+            {
+                this->m_isEmptyRegion = true;
+                break;
+            }
+            lineRegion = this->region.intersected(lineRect);
+
+            innerLineRect = searchLineFullHeight(regionRect, lineRect, lineRegion);
+        }
+    }
+
+    return wordRect;
+}
+
 void apTextEdit::paint(QPainter* painter)
 {
-	int countParagraphs = this->paragraphs;
+    int countParagraphs = this->paragraphs.count();
 	for (int iParagraph = 0; iParagraph < countParagraphs; iParagraph++)
 	{
 		apTextParagraph& paragraph = this->paragraphs[iParagraph];
@@ -47,23 +134,7 @@ void apTextEdit::paint(QPainter* painter)
 
 		if ( ! paragraph.isMeasured())
 		{
-			for (int iSection = 0; iSection < countSections; iSection++)
-			{
-				STextSection& section = paragraph.sections[iSection];
-
-				if ( ! section.isMeasured)
-				{
-					section.isMeasured = true;
-
-					painter->setFont(section.font);
-
-					section.size = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text);
-					section.minSize = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text.trimmed());
-                    section.ascent = QFontMetrics(painter->font()).ascent();
-				}
-			}
-
-			paragraph.isMeasured = true;
+            this->measure(painter, paragraph, countSections);
 		}
 
 
@@ -88,12 +159,29 @@ void apTextEdit::paint(QPainter* painter)
 			QRect lineRect(this->rect.x(), y, this->rect.width(), paragraph.sections.first().size.height());
 			QRegion lineRegion = this->region.intersected(lineRect);
 
-			QRect innerLineRect = lineRegion.boundingRect();
-			if (innerLineRect.height() < lineRect.height())
-			{
-				//
-			}
+            QRect innerLineRect = searchLineFullHeight(regionRect, lineRect, lineRegion);
 
+            if (lineRect.bottom() > regionRect.bottom())
+            {
+                this->m_isEmptyRegion = true;
+                return;
+            }
+
+            y = innerLineRect.y();
+
+            int wordLastSectionIndex = 0;
+            QSize firstWordSize = detWordSize(this->paragraphs.first().sections, 0, wordLastSectionIndex);
+
+            QRect wordRect = detWordRect(regionRect, innerLineRect.topLeft(), firstWordSize, lineRect, lineRegion, innerLineRect);
+            if (this->m_isEmptyRegion)
+            {
+                return;
+            }
+
+            y = wordRect.y();
+
+
+//////////////////////////////////////////////////////////
             int width = 0;
 			int maxLineCount = 0;
             int maxHeight = innerLineRect.height();

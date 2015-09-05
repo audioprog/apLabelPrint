@@ -25,6 +25,12 @@
 
 #include <QObject>
 
+#include <QColor>
+#include <QFont>
+#include <QRect>
+#include <QRegion>
+#include <QVariant>
+
 class QContextMenuEvent;
 class QKeyEvent;
 class QPainter;
@@ -61,16 +67,16 @@ class apTextParagraph
 public:
 	apTextParagraph() : alignment(Qt::AlignLeft) {}
 
-	bool isMeasured() const { return isMeasured; }
+    bool isMeasured() const { return m_isMeasured; }
 
-	inline void setMeasureDirty() { for (int i = 0; i < sections.count(); i++) { sections[i].isMeasured = false; } isMeasured = false; }
+    inline void setMeasureDirty() { for (int i = 0; i < sections.count(); i++) { sections[i].isMeasured = false; } m_isMeasured = false; }
 
 	Qt::Alignment alignment;
 
 	QList<STextSection> sections;
 
 private:
-	bool isMeasured;
+    bool m_isMeasured;
 };
 
 class apTextEdit : public QObject
@@ -102,6 +108,15 @@ protected:
 	void leaveEvent();
 	void contextMenuEvent(QContextMenuEvent*);
 
+    QRect detWordRect(const QRect& regionRect, const QPoint& startPoint, const QSize& wordSize, QRect& lineRect, QRegion& lineRegion, QRect& innerLineRect);
+
+private:
+    QSize detWordSize(const QList<STextSection>& sections, int sectionIndexStart, int& wordLastSectionIndex);
+
+    void measure(QPainter* painter, apTextParagraph& paragraph, int countSections);
+
+    QRect searchLineFullHeight(const QRect &regionRect, QRect &lineRect, QRegion &lineRegion);
+
 private:
 
 	int cursorPos;
@@ -109,6 +124,8 @@ private:
 	bool m_isVisible;
 
 	bool m_isRegionDirty;
+
+    bool m_isEmptyRegion;
 
     QRect m_usedArea;
 
