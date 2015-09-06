@@ -180,6 +180,15 @@ void apTextEdit::paint(QPainter* painter)
 
             y = wordRect.y();
 
+            while (!this->m_isEmptyRegion && wordLastSectionIndex < this->paragraphs.first().sections.count())
+            {
+                wordRect.moveRight(this->paragraphs.first().sections.at(wordLastSectionIndex).size.width() - this->paragraphs.first().sections.at(wordLastSectionIndex).minSize.width());
+
+                int wordStartSectionIndex = wordLastSectionIndex;
+                QSize wordSize = detWordSize(this->paragraphs.first().sections, wordStartSectionIndex + 1, wordLastSectionIndex);
+
+                QRect nextWordRect = detWordRect(regionRect, QPoint(wordRect.right(), innerLineRect.top()), wordSize, lineRect, lineRegion, innerLineRect);
+            }
 
 //////////////////////////////////////////////////////////
             int width = 0;
