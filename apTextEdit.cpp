@@ -47,6 +47,9 @@ void apTextEdit::measure(QPainter* painter, apTextParagraph& paragraph, int coun
         {
             section.isMeasured = true;
 
+            QPainterPath path;
+            path.addText(0.0, 0.0, section.font, section.text);
+            path.boundingRect();
             painter->setFont(section.font);
 
             section.size = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text).size();
