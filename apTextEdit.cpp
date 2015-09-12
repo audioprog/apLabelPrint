@@ -187,6 +187,11 @@ void apTextEdit::paint(QPainter* painter)
             {
                 wordRect.moveRight(this->paragraphs.first().sections.at(wordLastSectionIndex).size.width() - this->paragraphs.first().sections.at(wordLastSectionIndex).minSize.width());
 
+                for (int i = wordStartSectionIndex; i <= wordLastSectionIndex; i++)
+                {
+
+                }
+
                 int wordStartSectionIndex = wordLastSectionIndex;
                 QSize wordSize = detWordSize(this->paragraphs.first().sections, wordStartSectionIndex + 1, wordLastSectionIndex);
 
