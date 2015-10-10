@@ -54,6 +54,7 @@ void apTextEdit::measure(QPainter* painter, apTextParagraph& paragraph, int coun
 
             section.size = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text).size();
             section.minSize = painter->boundingRect(this->rect, Qt::TextSingleLine, section.text.trimmed()).size();
+            section.spaceAfter = section.size.width() - section.minSize.width();
             section.ascent = QFontMetrics(painter->font()).ascent();
         }
     }
@@ -157,7 +158,222 @@ void apTextEdit::paint(QPainter* painter)
 				return;
 			}
 
-			int y = regionRect.y();
+            int y = regionRect.y();
+
+            int startSection = 0;
+            if (startSection < countSections)
+            {
+                int sectLineWidth = 0;
+                int indexSection = 0;
+                QRegion lineRegion;
+                QRegion wordRegion;
+                int lineY = y;
+                int maxAscent = 0;
+                int wordMaxAscent = 0;
+                int wordWidth = 0;
+                int wordStartIndex = 0;
+
+                // eine Zeile ohne RegionTest
+                for (indexSection = startSection; indexSection < countSections; indexSection++)
+                {
+                    const STextSection& section = paragraph.sections.at(indexSection);
+
+                    int lineWidth = sectLineWidth + wordWidth + section.minSize.width();
+
+                    if (sectLineWidth < regionRect.width())
+                    {
+                        sectLineWidth = lineWidth;
+                        indexSection--;
+                        break;
+                    }
+                    else
+                    {
+                        if (section.minSize.width() == section.size.width())
+                        {
+                            if (wordMaxAscent == 0)
+                            {
+                                wordMaxAscent = qMax(maxAscent, section.ascent);
+
+                                section.pos = QPoint(regionRect.x() + sectLineWidth, lineY + wordMaxAscent - section.ascent);
+
+                                wordRegion = QRegion(section.pos.x(), section.pos.y(), section.size.width(), section.size.height());
+
+                                wordWidth = section.size.width();
+
+                                section.yInLine = wordMaxAscent;
+
+                                wordStartIndex = indexSection;
+                            }
+                            else if (section.ascent > wordMaxAscent)
+                            {
+                                int yTranslate = section.ascent - wordMaxAscent;
+
+                                wordRegion.translate(0, yTranslate);
+
+                                for (int i = wordStartIndex; i < indexSection; i++)
+                                {
+                                    paragraph.sections.at(i).yInLine += yTranslate;
+                                    paragraph.sections.at(i).pos.ry() += yTranslate;
+                                }
+
+                                wordMaxAscent = section.ascent;
+
+                                section.pos = QPoint(regionRect.x() + sectLineWidth + wordWidth, lineY);
+
+                                wordRegion += QRect(section.pos.x(), lineY, section.size.width(), section.size.height());
+
+                                wordWidth += section.size.width();
+                            }
+                            else
+                            {
+                                section.pos = QPoint(regionRect.x() + sectLineWidth + wordWidth, lineY + wordMaxAscent - section.ascent);
+
+                                wordRegion += QRect(section.pos.x(), section.pos.y(), section.size.width(), section.size.height());
+
+                                wordWidth += section.size.width();
+                            }
+
+                            section.yInLine = wordMaxAscent;
+                        }
+                        else if (wordWidth > 0)
+                        {
+                            if (section.ascent > wordMaxAscent)
+                            {
+                                int yTranslate = section.ascent - wordMaxAscent;
+
+                                wordRegion.translate(0, yTranslate);
+
+                                for (int i = wordStartIndex; i < indexSection; i++)
+                                {
+                                    paragraph.sections.at(i).yInLine += yTranslate;
+                                    paragraph.sections.at(i).pos.ry() += yTranslate;
+                                }
+
+                                wordMaxAscent = section.ascent;
+
+                                section.pos = QPoint(regionRect.x() + sectLineWidth + wordWidth, lineY);
+
+                                wordRegion += QRect(section.pos.x(), lineY, section.minSize.width(), section.size.height());
+                            }
+                            else
+                            {
+                                section.pos = QPoint(regionRect.x() + sectLineWidth + wordWidth, lineY + wordMaxAscent - section.ascent);
+
+                                wordRegion += QRect(section.pos.x(), section.pos.y(), section.minSize.width(), section.size.height());
+                            }
+
+                            wordWidth += section.size.width();
+
+                            section.yInLine = wordMaxAscent;
+
+                            if (maxAscent < wordMaxAscent)
+                            {
+                                int yTranslate = wordMaxAscent - maxAscent;
+
+                                lineRegion.translate(0, yTranslate);
+
+                                for (int i = startSection; i <= indexSection; i++)
+                                {
+                                    paragraph.sections.at(i).yInLine += yTranslate;
+                                    paragraph.sections.at(i).pos.ry() += yTranslate;
+                                }
+
+                                lineRegion += wordRegion;
+
+                                maxAscent = wordMaxAscent;
+                            }
+                            else
+                            {
+                                lineRegion += wordRegion;
+                            }
+
+                            sectLineWidth += wordWidth + section.spaceAfter;
+
+                            wordWidth = 0;
+                        }
+                        else if (section.ascent < maxAscent)
+                        {
+                            int yTranslate = section.ascent - maxAscent;
+
+                            maxAscent = section.ascent;
+
+                            lineRegion.translate(0, yTranslate);
+
+                            for (int i = startSection; i < indexSection; i++)
+                            {
+                                paragraph.sections.at(i).yInLine += yTranslate;
+                                paragraph.sections.at(i).pos.ry() += yTranslate;
+                            }
+
+                            section.yInLine = maxAscent;
+
+                            section.pos = QPoint(regionRect.x() + sectLineWidth, lineY);
+
+                            lineRegion += QRect(section.pos.x(), lineY, section.minSize.width(), section.minSize.height());
+
+                            sectLineWidth += section.size.width();
+                        }
+                        else
+                        {
+                            section.yInLine = maxAscent;
+
+                            section.pos = QPoint(regionRect.x() + sectLineWidth, lineY + maxAscent - section.ascent);
+
+                            lineRegion += QRect(section.pos.x(), section.pos.y(), section.minSize.width(), section.minSize.height());
+
+                            sectLineWidth += section.size.width();
+                        }
+                    }
+                }
+
+                // An Region anpassen
+                switch (paragraph.alignment)
+                {
+                case Qt::AlignLeft:
+                    {
+                        QRegion testLine = rectRegion.intersected(lineRegion).xored(lineRegion);
+
+                        if ( ! testLine.isEmpty())
+                        {
+                            for (int i = indexSection - 1; i >= startSection; i--)
+                            {
+                                if (paragraph.sections.at(i).spaceAfter == 0)
+                                {
+                                    const STextSection& section = paragraph.sections.at(i + 1);
+                                    wordWidth = section.size.width();
+                                    QRegion wordRegion(section.pos.x(), section.pos.y(), section.minSize.width(), section.minSize.height());
+                                    for (int j = i + 2; j < indexSection; j++)
+                                    {
+                                        const QPoint& pos = paragraph.sections.at(j).pos;
+                                        const QSize& size = paragraph.sections.at(j).minSize;
+                                        wordRegion += QRect(pos.x(), pos.y(), size.width(), size.height());
+                                        wordWidth += paragraph.sections.at(j).size.width();
+                                    }
+                                    if (wordRegion.intersects(testLine))
+                                    {
+                                        lineRegion -= wordRegion;
+                                        indexSection = i;
+                                        sectLineWidth -= wordWidth;
+                                    }
+                                    else
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            testLine = rectRegion.intersected(lineRegion).xored(lineRegion);
+
+                            if ( ! testLine.isEmpty())
+                            {
+                                int xTranslate = testLine.boundingRect().right();
+                                //
+                            }
+                        }
+                    }
+                    break;
+                }
+
 
 			QRect lineRect(this->rect.x(), y, this->rect.width(), paragraph.sections.first().size.height());
 			QRegion lineRegion = this->region.intersected(lineRect);

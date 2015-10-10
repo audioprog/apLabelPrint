@@ -57,6 +57,8 @@ struct STextSection
 
 	QVariant sourceId;
 
+    uint spaceAfter;
+
 	QString text;
 };
 
