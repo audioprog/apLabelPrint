@@ -24,6 +24,8 @@
 #include "apTextEdit.h"
 
 #include <QPainter>
+#include <QTextDocument>
+#include <QTextLayout>
 
 apTextEdit::apTextEdit(QObject *parent)
 	: QObject(parent)
@@ -129,169 +131,89 @@ QRect apTextEdit::detWordRect(const QRect &regionRect, const QPoint& startPoint,
 
 void apTextEdit::paint(QPainter* painter)
 {
-    int countParagraphs = this->paragraphs.count();
-	for (int iParagraph = 0; iParagraph < countParagraphs; iParagraph++)
-	{
-		apTextParagraph& paragraph = this->paragraphs[iParagraph];
+    QTextDocument* doc = NULL;
 
-		int countSections = paragraph.sections.count();
+    QTextBlock block = doc->begin();
 
-		if ( ! paragraph.isMeasured())
-		{
-            this->measure(painter, paragraph, countSections);
-		}
+    for (; block.isValid() && block != doc->end(); )
+    {
+        QTextLayout* textLayout = block.layout();
+        textLayout->beginLayout();
 
+        QTextLine line = textLayout->createLine();
+        line.setLeadingIncluded(false);
 
-        QPoint startPoint;
-		if (this->m_isRegionDirty)
-		{
-			QRegion rectRegion = this->region.intersected(this->rect);
-			if (rectRegion.isEmpty())
-			{
-				this->m_isEmptyRegion = true;
-				return;
-			}
-			QRect regionRect = rectRegion.boundingRect();
-			if (regionRect.height() < paragraph.sections.first().size.height())
-			{
-				this->m_isEmptyRegion = true;
-				return;
-			}
+        while (line.isValid()) {
 
-            int y = regionRect.y();
+            // We use lines at the top and bottom of the planned
+            // location for the text.
+            QLineF topLine = QLineF(0, y, width(), y);
+            QLineF bottomLine = topLine;
+            bottomLine.translate(0, line.height());
 
+            // Obtain all x-coordinates where intersections occur.
+            QVector<qreal> xCoords;
 
+            foreach (QPolygonF polygon, polygons) {
 
-			QRect lineRect(this->rect.x(), y, this->rect.width(), paragraph.sections.first().size.height());
-			QRegion lineRegion = this->region.intersected(lineRect);
-
-            QRect innerLineRect = searchLineFullHeight(regionRect, lineRect, lineRegion);
-
-            if (lineRect.bottom() > regionRect.bottom())
-            {
-                this->m_isEmptyRegion = true;
-                return;
-            }
-
-            y = innerLineRect.y();
-
-            int wordLastSectionIndex = 0;
-            QSize firstWordSize = detWordSize(this->paragraphs.first().sections, 0, wordLastSectionIndex);
-
-            QRect wordRect = detWordRect(regionRect, innerLineRect.topLeft(), firstWordSize, lineRect, lineRegion, innerLineRect);
-            if (this->m_isEmptyRegion)
-            {
-                return;
-            }
-
-            y = wordRect.y();
-
-            while (!this->m_isEmptyRegion && wordLastSectionIndex < this->paragraphs.first().sections.count())
-            {
-                wordRect.moveRight(this->paragraphs.first().sections.at(wordLastSectionIndex).size.width() - this->paragraphs.first().sections.at(wordLastSectionIndex).minSize.width());
-
-                for (int i = wordStartSectionIndex; i <= wordLastSectionIndex; i++)
-                {
-
+                for (int i = 0; (i+1) < polygon.size(); ++i) {
+                    QLineF pLine = QLineF(polygon[i], polygon[i+1]);
+                    QPointF p;
+                    if (pLine.intersect(topLine, &p) == QLineF::BoundedIntersection)
+                        xCoords.append(p.x());
+                    if (pLine.intersect(bottomLine, &p) == QLineF::BoundedIntersection)
+                        xCoords.append(p.x());
                 }
-
-                int wordStartSectionIndex = wordLastSectionIndex;
-                QSize wordSize = detWordSize(this->paragraphs.first().sections, wordStartSectionIndex + 1, wordLastSectionIndex);
-
-                QRect nextWordRect = detWordRect(regionRect, QPoint(wordRect.right(), innerLineRect.top()), wordSize, lineRect, lineRegion, innerLineRect);
             }
 
-//////////////////////////////////////////////////////////
-            int width = 0;
-			int maxLineCount = 0;
-            int maxHeight = innerLineRect.height();
-            uint maxAscent = 0;
+            // If intersections occurred, sort them and use the innermost
+            // x-coordinates as horizontal delimiters to mark the area in
+            // which text can be written.
+            qreal left;
+            qreal right;
 
-			for (int i = 0; i < paragraph.sections.count(); i++)
-			{
-				width += paragraph.sections.at(i).size.width();
-				if (width > innerLineRect.width())
-				{
-					maxLineCount = i;
-					break;
-				}
-                else
-                {
-                    uint ascent = paragraph.sections.at(i).ascent;
-                    if (ascent > maxAscent)
-                    {
-                        maxAscent = ascent;
-                    }
-                }
-				if (maxHeight < paragraph.sections.at(i).size.height())
-				{
-					maxHeight = paragraph.sections.at(i).size.height();
-				}
-			}
-			lineRect = QRect(this->rect.x(), y, this->rect.width(), maxHeight);
-			lineRegion = this->region.intersected(lineRect);
-			innerLineRect = lineRegion.boundingRect();
+            if (xCoords.size() > 0 && (xCoords.size() % 2) == 0) {
+                qSort(xCoords.begin(), xCoords.end());
 
-			int x = innerLineRect.x();
-			int right = x + innerLineRect.width();
+                left = xCoords[xCoords.size()/2 - 1] + margin;
+                right = xCoords[xCoords.size()/2] - margin;
 
-			int lastLineSection = 0;
+                line.setPosition(QPointF(left, y));
+                line.setLineWidth(right - left);
 
-			for (int iSection = 0; iSection < paragraph.sections.count(); iSection++)
-			{
-                paragraph.sections.at(iSection).yInLine = maxAscent - paragraph.sections.at(iSection).ascent;
-				bool isSearching = true;
-				while (isSearching)
-				{
-                    QRect testRect = QRect(QPoint(x, y + paragraph.sections.at(iSection).yInLine), paragraph.sections.at(iSection).minSize);
-					QRegion singleRegion = lineRegion.intersected(testRect);
-					if (singleRegion.isEmpty())
-					{
-						x += paragraph.sections.at(isSearching).minSize;
-					}
-					else
-					{
-						QRegion insertedSingleRegion = singleRegion.xored(testRect);
-						if (insertedSingleRegion.isEmpty())
-						{
-							paragraph.sections.at(iSection).pos = testRect.topLeft();
+                y += line.height();
 
-							x += paragraph.sections.at(iSection).size.width();
+                // If the text is wider than the available space, move the
+                // text onto the next line if there is space.
+                if (line.naturalTextWidth() <= (right - left) && y <= ymax)
+                    line = textLayout->createLine();
+            } else
+                y += lineHeight;
 
-							isSearching = false;
-						}
-						else
-						{
-							x += insertedSingleRegion.boundingRect().width();
-						}
-					}
+            // Break if there isn't enough space for another line.
+            if (y + lineHeight > ymax)
+                break;
+        }
 
-					if (x > right)
-					{
-						if (iSection == lastLineSection)
-						{
-							y += 5;
-						}
-						else
-						{
-							y += lineRect.height();
-						}
+        if (line.isValid())
+        {
+            line.setPosition(QPointF(xScale * shapeWidth, yScale * shapeHeight));
 
-						lineRect = QRect(this->rect.x(), y, this->rect.width(), paragraph.sections.at(isSearching).size.height());
-						lineRegion = this->region.intersected(lineRect);
+            textLayout->endLayout();
+            layouts.append(textLayout);
 
-						innerLineRect = lineRegion.boundingRect();
+            // Since we are going to be laying out the next paragraph, we can
+            // increase the y-coordinate to insert some extra space.
+            y += line.leading();
+        }
+        else
+        {
+            if (y + lineHeight > ymax)
+            break;
+        }
 
-						x = innerLineRect.x();
-						right = x + innerLineRect.width();
-
-						lastLineSection = 0;
-					}
-				}
-			QRect innnerRect = lineRegion.boundingRect();
-			if (lineRegion.y() > this->rect)
-		}
-	}
+        block = block.next();
+    }
 }
 
 void apTextEdit::paintSimple()
