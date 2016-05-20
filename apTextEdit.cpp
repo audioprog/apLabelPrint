@@ -151,6 +151,39 @@ void apTextEdit::paint(QPainter* painter)
             QLineF bottomLine = topLine;
             bottomLine.translate(0, line.height());
 
+            QRegion topLineRegion(this->rect.x(), this->rect.y(), line.rect().width(), 1);
+            QRegion topLineRegions = this->region.intersected(topLineRegion);
+
+            QRegion bottomLineRegion(this->rect.x(), this->rect.y() + line.height(), line.rect().width(), 1);
+            QRegion bottomLineRegions = this->region.intersected(bottomLineRegion);
+
+            QRegion mergedRegion = topLineRegions.intersected(bottomLineRegions.translated(0, -line.height()));
+            if ( ! mergedRegion.isEmpty())
+            {
+                QVector<QRect> rects = mergedRegion.rects();
+
+                QRect currentRect = rects.first();
+                for (int i = 1; i < rects.count(); i++)
+                {
+                    const QRect& rect = rects[i];
+                    if (currentRect.right() + 1 == rect.x())
+                    {
+                        currentRect |= rect;
+                    }
+                    else
+                    {
+                        line.setLineWidth(currentRect.width());
+
+                        QRegion lineRegion(currentRect.x(), currentRect.y(), line.width(), line.height());
+                        QRegion intersectionLineRegion = this->region.intersected(lineRegion);
+                        QRegion xoredRegion = intersectionLineRegion.xored(lineRegion);
+                        if ( ! xoredRegion.isEmpty())
+                        {
+                            //
+                        }
+                        currentRect = rect;
+                    }
+                }
             // Obtain all x-coordinates where intersections occur.
             QVector<qreal> xCoords;
 
